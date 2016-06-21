@@ -97,48 +97,64 @@ p_memsz = 140
 p_align = 2097152
 # 0x78
 
+class SectionHeader(object):
+
+    def __init__(self):
+        self.name = 0
+        self.type = SECTION_TYPE.NULL
+        self.flags = 0
+        self.addr = 0
+        self.offset = 0
+        self.size = 0
+        self.link = 0
+        self.info = 0
+        self.addralign = 0
+        self.entsize = 0
+
 # 0x180 - 0x00 section header entry? if all zeroes, it could be
+sh_zero = SectionHeader()
+
 # 0x1c0 - 0x1b section header entry
-#   name: 27 (.text)
-#   type: 1 (progbits)
-#   flags: 6
-#   addr: 4194432
-#   offset: 128
-#   size: 12
-#   link: 0
-#   info: 0
-#   addralign: 16
-#   entsize: 0
+sh_text = SectionHeader()
+sh_text.name = 27
+sh_text.type = SECTION_TYPE.PROGBITS
+sh_text.flags = 6
+sh_text.addr = 4194432
+sh_text.offset = 128
+sh_text.size = 12
+sh_text.addralign = 16
+
 # 0x200 - 0x11 section header entry
-#   name: 17 (shstrtab)
-#   type: 3 (strtab)
-#   flags: 0
-#   addr: 0
-#   offset: 348 (0x15c)
-#   size: 33
-#   link: 0
-#   info: 0
-#   addralign: 1
-#   entsize: 0
+sh_shstrtab = SectionHeader()
+sh_shstrtab.name = 17
+sh_shstrtab.type = SECTION_TYPE.STRTAB
+sh_shstrtab.flags = 0
+sh_shstrtab.addr = 0
+sh_shstrtab.offset = 348
+sh_shstrtab.size = 33
+sh_shstrtab.addralign = 1
+
 # 0x240 - 0x01 section header entry
-#   name: 1
-#   type: 2 (symtab)
-#   flags: 0
-#   addr: 0
-#   offset: 144
-#   size: 168
-#   link: 4
-#   info: 3
-#   addralign: 8
-#   entsize: 24
+sh_symtab.name = 1
+sh_symtab.type = SECTION_TYPE.SYMTAB
+sh_symtab.offset = 144
+sh_symtab.size = 168
+sh_symtab.link = 4
+sh_symtab.info = 3
+sh_symtab.addralign = 8
+sh_symtab.entsize = 24
+
 # 0x280 - 0x09 section header entry
-#   name: 9 (.strtab)
-#   type: 3 (strtab)
-#   flags: 0
-#   addr: 0
-#   offset: 312
-#   size: 36
-#   link: 0
-#   info: 0
-#   addralign: 1
-#   entsize: 0
+sh_strtab.name = 9
+sh_strtab.type = SECTION_TYPE.STRTAB
+sh_strtab.offset = 312
+sh_strtab.size = 36
+sh_strtab.addralign = 1
+
+section_headers = [
+    sh_zero,
+    sh_text,
+    sh_shstrtab,
+    sh_symtab,
+    sh_strtab
+]
