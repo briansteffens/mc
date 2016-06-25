@@ -9,73 +9,88 @@ b4 = lambda x: b('I', x)
 b8 = lambda x: b('L', x)
 bstr = lambda x: [ord(b) for b in x] + [0]
 
-class CLASS(Enum):
-    BITS_32 = 1
-    BITS_64 = 2
+# EI_CLASS: 64-bit
+ELFCLASS64 = 2
 
-class DATA(Enum):
-    ENDIANNESS_LITTLE = 1
-    ENDIANNESS_BIG = 2
+# EI_DATA: little-endian
+ELFDATA2LSB = 1
 
-class TYPE(Enum):
-    RELOCATABLE = 1
-    EXECUTABLE = 2
-    SHARED = 3
-    CORE = 4
+# EI_VERSION: current
+EV_CURRENT = 1
 
-class ABI(Enum):
-    SYSTEM_V = 0x00
+# EI_OSABI: UNIX System V ABI
+ELFOSABI_SYSV = 0
 
-class ISA(Enum):
-    NONE = 0x00
-    SPARC = 0x02
-    X86 = 0x03
-    MIPS = 0x08
-    POWERPC = 0x14
-    ARM = 0x28
-    SUPERH = 0x2a
-    IA64 = 0x32
-    X86_64 = 0x3e
-    AARCH64 = 0xb7
+# e_type values
+ET_NONE = 0     # Unknown
+ET_REL  = 1     # Relocatable
+ET_EXEC = 2     # Executable
+ET_DYN  = 3     # Shared (dynamic) object
+ET_CORE = 4     # Core file
 
-class SEGMENT_TYPE(Enum):
-    NULL    = 0x00000000
-    LOAD    = 0x00000001
-    DYNAMIC = 0x00000002
-    INTERP  = 0x00000003
-    NOTE    = 0x00000004
-    SHLIB   = 0x00000005
-    PHDR    = 0x00000006
-    LOOS    = 0x60000000
-    HIOS    = 0x6fffffff
-    LOPROC  = 0x70000000
-    HIPROC  = 0x7fffffff
+# e_machine values
+EM_X86_64 = 0x3e
 
-class SECTION_TYPE(Enum):
-    NULL     = 0x00000000
-    PROGBITS = 0x00000001
-    SYMTAB   = 0x00000002
-    STRTAB   = 0x00000003
-    RELA     = 0x00000004
-    HASH     = 0x00000005
-    DYNAMIC  = 0x00000006
-    NOTE     = 0x00000007
-    NOBITS   = 0x00000008
-    REL      = 0x00000009
-    SHLIB    = 0x00000010
-    DYNSYM   = 0x00000011
-    LOOS     = 0x60000000
-    HIOS     = 0x6fffffff
-    LOPROC   = 0x70000000
-    HIPROC   = 0x7fffffff
-    LOUSER   = 0x80000000
-    HIUSER   = 0xffffffff
+# p_type values (segment types)
+PT_NULL    = 0          # Unused
+PT_LOAD    = 1          # Loadable segment
+PT_DYNAMIC = 2          # Dynamic linking information
+PT_INTERP  = 3          # Interpreter path
+PT_NOTE    = 4          # Auxiliary information
+PT_SHLIB   = 5          # Unspecified / invalid
+PT_PHDR    = 6          # Locates the program header table
+PT_LOPROC  = 0x70000000 # Start of processor-specific semantics
+PT_HIPROC  = 0x7fffffff # End of processor-specific semantics
+
+# p_flags - segment flags
+PF_R = 4 # Readable
+PF_W = 2 # Writable
+PF_X = 1 # Executable
+
+# sh_type - section type
+SHT_NULL     = 0
+SHT_PROGBITS = 1
+SHT_SYMTAB   = 2
+SHT_STRTAB   = 3
+SHT_RELA     = 4
+SHT_HASH     = 5
+SHT_DYNAMIC  = 6
+SHT_NOTE     = 7
+SHT_NOBITS   = 8
+SHT_REL      = 9
+SHT_SHLIB    = 10
+SHT_LOPROC   = 0x70000000
+SHT_HIPROC   = 0x7fffffff
+SHT_LOUSER   = 0x80000000
+SHT_HIUSER   = 0xffffffff
+
+# st_info values (symbol type)
+STT_NOTYPE  = 0
+STT_OBJECT  = 1
+STT_FUNC    = 2
+STT_SECTION = 3
+STT_FILE    = 4
+STT_LOPROC  = 13
+STT_HIPROC  = 15
+
+# st_info values (symbol binding)
+STB_LOCAL = 0
+STB_GLOBAL = 1
+STB_WEAK = 2
+STB_LOPROC = 13
+STB_HIPROC = 15
+
+# st_other values (symbol visibility)
+STV_DEFAULT = 0
+STV_INTERNAL = 1
+STV_HIDDEN = 2
+STV_PROTECTED = 3
 
 class SectionHeader(object):
 
     def __init__(self):
         self.name = 0
-        self.type = SECTION_TYPE.NULL
+        self.type = SHT_NULL
         self.flags = 0
         self.addr = 0
         self.offset = 0
@@ -89,7 +104,7 @@ class SectionHeader(object):
         ret = []
 
         ret.extend(b4(self.name))
-        ret.extend(b4(self.type.value))
+        ret.extend(b4(self.type))
         ret.extend(b8(self.flags))
         ret.extend(b8(self.addr))
         ret.extend(b8(self.offset))
@@ -101,43 +116,12 @@ class SectionHeader(object):
 
         return ret
 
-class SymbolTableBind(Enum):
-    STB_LOCAL = 0
-    STB_GLOBAL = 1
-    STB_WEAK = 2
-    STB_LOOS = 10
-    STB_HIOS = 12
-    STB_LOPROC = 13
-    STB_HIPROC = 15
-
-class SymbolTableType(Enum):
-    STT_NOTYPE = 0
-    STT_OBJECT = 1
-    STT_FUNC = 2
-    STT_SECTION = 3
-    STT_FILE = 4
-    STT_COMMON = 5
-    STT_TLS = 6
-    STT_LOOS = 10
-    STT_HIOS = 12
-    STT_LOPROC = 13
-    STT_HIPROC = 15
-
-class SymbolTableOther(Enum):
-    STV_DEFAULT = 0
-    STV_INTERNAL = 1
-    STV_HIDDEN = 2
-    STV_PROTECTED = 3
-    STV_EXPORTED = 4
-    STV_SINGLETON = 5
-    STV_ELIMINATE = 6
-
 class SymbolTableEntry(object):
 
     def __init__(self):
         self.name = 0
-        self.info = SymbolTableType.STT_NOTYPE
-        self.other = SymbolTableOther.STV_DEFAULT
+        self.info = STT_NOTYPE
+        self.other = STV_DEFAULT
         self.section_header_index = 0
         self.value = 0
         self.size = 0
@@ -165,13 +149,8 @@ class SymbolTableEntry(object):
         ret = []
 
         ret.extend(b4(self.name))
-
-        if hasattr(self.info, 'value'):
-            ret.append(self.info.value)
-        else:
-            ret.append(self.info)
-
-        ret.append(self.other.value)
+        ret.append(self.info)
+        ret.append(self.other)
         ret.extend(b2(self.section_header_index))
         ret.extend(b8(self.value))
         ret.extend(b8(self.size))
@@ -180,20 +159,22 @@ class SymbolTableEntry(object):
 
 output = []
 
+# header ----------------------------------------------------------------------
+
 # +0 (4 bytes) EI_MAG
 output.extend([0x7f, ord('E'), ord('L'), ord('F')])
 
 # +4 (1 byte) EI_CLASS
-output.append(CLASS.BITS_64.value)
+output.append(ELFCLASS64)
 
 # +5 (1 byte) EI_DATA
-output.append(DATA.ENDIANNESS_LITTLE.value)
+output.append(ELFDATA2LSB)
 
 # +6 (1 byte) EI_VERSION
-output.append(1)
+output.append(EV_CURRENT)
 
 # +7 (1 byte) EI_OSABI
-output.append(ABI.SYSTEM_V.value)
+output.append(ELFOSABI_SYSV)
 
 # +8 (1 byte) EI_ABIVERSION
 output.append(0)
@@ -202,13 +183,13 @@ output.append(0)
 output.extend([0, 0, 0, 0, 0, 0, 0])
 
 # +16 (2 bytes) e_type
-output.extend(b2(TYPE.EXECUTABLE.value))
+output.extend(b2(ET_EXEC))
 
 # +18 (2 bytes) e_machine
-output.extend(b2(ISA.X86_64.value))
+output.extend(b2(EM_X86_64))
 
 # +20 (4 bytes) e_version
-output.extend(b4(1))
+output.extend(b4(EV_CURRENT))
 
 # +24 (8 bytes) e_entry
 output.extend(b8(4194432))
@@ -240,11 +221,13 @@ output.extend(b2(5))
 # +62 (2 bytes) e_shstrndx
 output.extend(b2(2))
 
+# ? ---------------------------------------------------------------------------
+
 # +64 (4 bytes) p_type
-output.extend(b4(SEGMENT_TYPE.LOAD.value))
+output.extend(b4(PT_LOAD))
 
 # +68 (4 bytes) p_flags
-output.extend(b4(5))
+output.extend(b4(PF_R | PF_X))
 
 # +72 (8 bytes) p_offset
 output.extend(b8(0))
@@ -267,6 +250,8 @@ output.extend(b8(2097152))
 # +120 (8 bytes) TODO: unknown
 output.extend([0, 0, 0, 0, 0, 0, 0, 0])
 
+# program code ----------------------------------------------------------------
+
 # +128 (12 bytes) code section
 output.extend([0xb8, 0x3c, 0, 0, 0]) # mov rax, 60
 output.extend([0xbf, 0x4d, 0, 0, 0]) # mov rdi, 99
@@ -275,13 +260,15 @@ output.extend([0x0f, 0x05])          # syscall
 # +140 (4 bytes) TODO: unknown
 output.extend([0, 0, 0, 0])
 
+# symtab ----------------------------------------------------------------------
+
 # +144 (24 bytes) symtab0
 symtab0 = SymbolTableEntry()
 output.extend(symtab0.to_bytes())
 
 # +168 (24 bytes) symtab1
 symtab1 = SymbolTableEntry()
-symtab1.info = SymbolTableType.STT_SECTION
+symtab1.info = STT_SECTION
 symtab1.section_header_index = 1
 symtab1.value = 4194432
 output.extend(symtab1.to_bytes())
@@ -289,7 +276,7 @@ output.extend(symtab1.to_bytes())
 # +192 (24 bytes) symtab2
 symtab2 = SymbolTableEntry()
 symtab2.name = 1 # exit77.asm
-symtab2.info = SymbolTableType.STT_FILE
+symtab2.info = STT_FILE
 symtab2.section_header_index = 65521
 output.extend(symtab2.to_bytes())
 
@@ -383,7 +370,7 @@ output.extend(sh_zero.to_bytes())
 # +448 - 0x1b section header entry
 sh_text = SectionHeader()
 sh_text.name = 27
-sh_text.type = SECTION_TYPE.PROGBITS
+sh_text.type = SHT_PROGBITS
 sh_text.flags = 6
 sh_text.addr = 4194432
 sh_text.offset = 128
@@ -394,7 +381,7 @@ output.extend(sh_text.to_bytes())
 # +512 - 0x11 section header entry
 sh_shstrtab = SectionHeader()
 sh_shstrtab.name = 17
-sh_shstrtab.type = SECTION_TYPE.STRTAB
+sh_shstrtab.type = SHT_STRTAB
 sh_shstrtab.flags = 0
 sh_shstrtab.addr = 0
 sh_shstrtab.offset = 348
@@ -405,7 +392,7 @@ output.extend(sh_shstrtab.to_bytes())
 # +576 - 0x01 section header entry
 sh_symtab = SectionHeader()
 sh_symtab.name = 1
-sh_symtab.type = SECTION_TYPE.SYMTAB
+sh_symtab.type = SHT_SYMTAB
 sh_symtab.offset = 144
 sh_symtab.size = 168
 sh_symtab.link = 4
@@ -417,7 +404,7 @@ output.extend(sh_symtab.to_bytes())
 # +640 - 0x09 section header entry
 sh_strtab = SectionHeader()
 sh_strtab.name = 9
-sh_strtab.type = SECTION_TYPE.STRTAB
+sh_strtab.type = SHT_STRTAB
 sh_strtab.offset = 312
 sh_strtab.size = 36
 sh_strtab.addralign = 1
