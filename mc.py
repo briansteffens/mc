@@ -254,7 +254,7 @@ output.extend([0, 0, 0, 0, 0, 0, 0, 0])
 
 # +128 (12 bytes) code section
 output.extend([0xb8, 0x3c, 0, 0, 0]) # mov rax, 60
-output.extend([0xbf, 0x4d, 0, 0, 0]) # mov rdi, 99
+output.extend([0xbf, 0x4d, 0, 0, 0]) # mov rdi, 77
 output.extend([0x0f, 0x05])          # syscall
 
 # +140 (4 bytes) TODO: unknown
