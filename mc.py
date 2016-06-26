@@ -89,7 +89,8 @@ STV_PROTECTED = 3
 class SectionHeader(object):
 
     def __init__(self):
-        self.name = 0
+        self.name = None
+        self.name_offset = 0
         self.type = SHT_NULL
         self.flags = 0
         self.addr = 0
@@ -103,7 +104,7 @@ class SectionHeader(object):
     def to_bytes(self):
         ret = []
 
-        ret.extend(b4(self.name))
+        ret.extend(b4(self.name_offset))
         ret.extend(b4(self.type))
         ret.extend(b8(self.flags))
         ret.extend(b8(self.addr))
@@ -158,111 +159,14 @@ class SymbolTableEntry(object):
 
         return ret
 
-e_shoff = 388
-
-output = []
-
-# header ----------------------------------------------------------------------
-
-# +0 (4 bytes) EI_MAG
-output.extend([0x7f, ord('E'), ord('L'), ord('F')])
-
-# +4 (1 byte) EI_CLASS
-output.append(ELFCLASS64)
-
-# +5 (1 byte) EI_DATA
-output.append(ELFDATA2LSB)
-
-# +6 (1 byte) EI_VERSION
-output.append(EV_CURRENT)
-
-# +7 (1 byte) EI_OSABI
-output.append(ELFOSABI_SYSV)
-
-# +8 (1 byte) EI_ABIVERSION
-output.append(0)
-
-# +9 (7 bytes) EI_PAD
-output.extend([0, 0, 0, 0, 0, 0, 0])
-
-# +16 (2 bytes) e_type
-output.extend(b2(ET_EXEC))
-
-# +18 (2 bytes) e_machine
-output.extend(b2(EM_X86_64))
-
-# +20 (4 bytes) e_version
-output.extend(b4(EV_CURRENT))
-
-# +24 (8 bytes) e_entry
-output.extend(b8(4194432))
-
-# +32 (8 bytes) e_phoff
-output.extend(b8(64))
-
-# +40 (8 bytes) e_shoff
-output.extend(b8(e_shoff))
-
-# +48 (4 bytes) e_flags
-output.extend([0, 0, 0, 0])
-
-# +52 (2 bytes) e_ehsize
-output.extend(b2(64))
-
-# +54 (2 bytes) e_phentsize
-output.extend(b2(56))
-
-# +56 (2 bytes) e_phnum
-output.extend(b2(1))
-
-# +58 (2 bytes) e_shentsize
-output.extend(b2(64))
-
-# +60 (2 bytes) e_shnum
-output.extend(b2(5))
-
-# +62 (2 bytes) e_shstrndx
-output.extend(b2(2))
-
-# ? ---------------------------------------------------------------------------
-
-# +64 (4 bytes) p_type
-output.extend(b4(PT_LOAD))
-
-# +68 (4 bytes) p_flags
-output.extend(b4(PF_R | PF_X))
-
-# +72 (8 bytes) p_offset
-output.extend(b8(0))
-
-# +80 (8 bytes) p_vaddr
-output.extend(b8(4194304))
-
-# +88 (8 bytes) p_paddr
-output.extend(b8(4194304))
-
-# +96 (8 bytes) p_filesz
-output.extend(b8(140))
-
-# +104 (8 bytes) p_memsz
-output.extend(b8(140))
-
-# +112 (8 bytes) p_align
-output.extend(b8(2097152))
-
-# +120 (8 bytes) TODO: unknown
-output.extend([0, 0, 0, 0, 0, 0, 0, 0])
-
 # program code ----------------------------------------------------------------
 
-# code + 0 (16 bytes) code section
-output.extend([0xb8, 0x3c, 0, 0, 0])    # mov rax, 60
-output.extend([0xbf, 0x4d, 0, 0, 0])    # mov rdi, 77
-output.extend([0x48, 0x83, 0xc7, 0x03]) # add rdi, 3
-output.extend([0x0f, 0x05])             # syscall
-
-# code + 16 (4 bytes) TODO: unknown
-output.extend([0, 0, 0, 0])
+program_bytes = [
+    0xb8, 0x3c, 0, 0, 0,      # mov rax, 60
+    0xbf, 0x4d, 0, 0, 0,      # mov rdi, 77
+    0x48, 0x83, 0xc7, 0x03,   # add rdi, 3
+    0x0f, 0x05                # syscall
+]
 
 # symtab ----------------------------------------------------------------------
 
@@ -370,89 +274,201 @@ symtab_bytes = []
 for st in symtab:
     symtab_bytes.extend(st.to_bytes())
 
-output.extend(symtab_bytes)
-output.extend(strtab_bytes)
-
-# shstrtab --------------------------------------------------------------------
-
-# shstrtab + 0 (1 byte) # TODO: unknown
-output.append(0)
-
-# shstrtab + 1 (1 byte) # TODO: unknown (all these 0x2e bytes)
-output.append(0x2e)
-
-# shstrtab + 2 (7 bytes)
-output.extend(bstr("symtab"))
-
-# shstrtab + 9 (1 byte)
-output.append(0x2e)
-
-# shstrtab + 10 (7 bytes)
-output.extend(bstr("strtab"))
-
-# shstrtab + 17 (1 byte)
-output.append(0x2e)
-
-# shstrtab + 18 (9 bytes)
-output.extend(bstr("shstrtab"))
-
-# shstrtab + 27 (1 byte)
-output.append(0x2e)
-
-# shstrtab + 28 (5 bytes)
-output.extend(bstr("text"))
-
-# shstrtab + 33 (3 bytes) # TODO: unknown
-output.extend([0, 0, 0])
-
 # section headers -------------------------------------------------------------
 
 # e_shoff + 0 - 0x00 section header entry
 sh_zero = SectionHeader()
-output.extend(sh_zero.to_bytes())
 
 # e_shoff + 64 - 0x1b section header entry
 sh_text = SectionHeader()
-sh_text.name = 27
+sh_text.name = "text"
 sh_text.type = SHT_PROGBITS
 sh_text.flags = 6
 sh_text.addr = 4194432
-sh_text.offset = 128
-sh_text.size = 12
 sh_text.addralign = 16
-output.extend(sh_text.to_bytes())
 
 # e_shoff + 128 - 0x11 section header entry
 sh_shstrtab = SectionHeader()
-sh_shstrtab.name = 17
+sh_shstrtab.name = "shstrtab"
 sh_shstrtab.type = SHT_STRTAB
 sh_shstrtab.flags = 0
 sh_shstrtab.addr = 0
-sh_shstrtab.offset = 352
-sh_shstrtab.size = 33
 sh_shstrtab.addralign = 1
-output.extend(sh_shstrtab.to_bytes())
 
 # e_shoff + 192 - 0x01 section header entry
 sh_symtab = SectionHeader()
-sh_symtab.name = 1
+sh_symtab.name = "symtab"
 sh_symtab.type = SHT_SYMTAB
-sh_symtab.offset = 148
-sh_symtab.size = 168
 sh_symtab.link = 4
 sh_symtab.info = 3
 sh_symtab.addralign = 8
 sh_symtab.entsize = 24
-output.extend(sh_symtab.to_bytes())
 
 # e_shoff + 256 - 0x09 section header entry
 sh_strtab = SectionHeader()
-sh_strtab.name = 9
+sh_strtab.name = "strtab"
 sh_strtab.type = SHT_STRTAB
-sh_strtab.offset = 316
-sh_strtab.size = 36
 sh_strtab.addralign = 1
-output.extend(sh_strtab.to_bytes())
+
+section_headers = [
+    sh_zero,
+    sh_text,
+    sh_shstrtab,
+    sh_symtab,
+    sh_strtab
+]
+
+# shstrtab --------------------------------------------------------------------
+
+# Build shstrtab and set section header name offsets
+shstrtab = []
+offset = 1
+
+for sh in section_headers:
+    if sh.name is None:
+        continue
+
+    shstrtab.append(sh.name)
+    sh.name_offset = offset
+    offset += len(sh.name) + 2
+
+# Render shstrtab binary
+shstrtab_bytes = [0]
+
+for s in shstrtab:
+    shstrtab_bytes.append(0x2e) # TODO: unknown
+    shstrtab_bytes.extend(bstr(s))
+
+# final calculations ----------------------------------------------------------
+
+sh_text.size = len(program_bytes)
+sh_symtab.size = len(symtab_bytes)
+sh_strtab.size = len(strtab_bytes)
+sh_shstrtab.size = len(shstrtab_bytes)
+
+sh_text.offset = 128
+sh_symtab.offset = sh_text.offset + sh_text.size + 4
+sh_strtab.offset = sh_symtab.offset + sh_symtab.size
+sh_shstrtab.offset = sh_strtab.offset + sh_strtab.size
+
+# Render section headers
+section_headers_bytes = []
+
+for sh in section_headers:
+    section_headers_bytes.extend(sh.to_bytes())
+
+e_shoff = (
+    128 +
+    len(program_bytes) +
+    4 +
+    len(symtab_bytes) +
+    len(strtab_bytes) +
+    len(shstrtab_bytes) +
+    3
+)
+
+# output ----------------------------------------------------------------------
+
+output = []
+
+# header ----------------------------------------------------------------------
+
+# +0 (4 bytes) EI_MAG
+output.extend([0x7f, ord('E'), ord('L'), ord('F')])
+
+# +4 (1 byte) EI_CLASS
+output.append(ELFCLASS64)
+
+# +5 (1 byte) EI_DATA
+output.append(ELFDATA2LSB)
+
+# +6 (1 byte) EI_VERSION
+output.append(EV_CURRENT)
+
+# +7 (1 byte) EI_OSABI
+output.append(ELFOSABI_SYSV)
+
+# +8 (1 byte) EI_ABIVERSION
+output.append(0)
+
+# +9 (7 bytes) EI_PAD
+output.extend([0, 0, 0, 0, 0, 0, 0])
+
+# +16 (2 bytes) e_type
+output.extend(b2(ET_EXEC))
+
+# +18 (2 bytes) e_machine
+output.extend(b2(EM_X86_64))
+
+# +20 (4 bytes) e_version
+output.extend(b4(EV_CURRENT))
+
+# +24 (8 bytes) e_entry
+output.extend(b8(4194432))
+
+# +32 (8 bytes) e_phoff
+output.extend(b8(64))
+
+# +40 (8 bytes) e_shoff
+output.extend(b8(e_shoff))
+
+# +48 (4 bytes) e_flags
+output.extend([0, 0, 0, 0])
+
+# +52 (2 bytes) e_ehsize
+output.extend(b2(64))
+
+# +54 (2 bytes) e_phentsize
+output.extend(b2(56))
+
+# +56 (2 bytes) e_phnum
+output.extend(b2(1))
+
+# +58 (2 bytes) e_shentsize
+output.extend(b2(64))
+
+# +60 (2 bytes) e_shnum
+output.extend(b2(5))
+
+# +62 (2 bytes) e_shstrndx
+output.extend(b2(2))
+
+# ? ---------------------------------------------------------------------------
+
+# +64 (4 bytes) p_type
+output.extend(b4(PT_LOAD))
+
+# +68 (4 bytes) p_flags
+output.extend(b4(PF_R | PF_X))
+
+# +72 (8 bytes) p_offset
+output.extend(b8(0))
+
+# +80 (8 bytes) p_vaddr
+output.extend(b8(4194304))
+
+# +88 (8 bytes) p_paddr
+output.extend(b8(4194304))
+
+# +96 (8 bytes) p_filesz
+output.extend(b8(140))
+
+# +104 (8 bytes) p_memsz
+output.extend(b8(140))
+
+# +112 (8 bytes) p_align
+output.extend(b8(2097152))
+
+# +120 (8 bytes) TODO: unknown
+output.extend([0, 0, 0, 0, 0, 0, 0, 0])
+
+output.extend(program_bytes)
+output.extend([0, 0, 0, 0]) # TODO: unknown
+output.extend(symtab_bytes)
+output.extend(strtab_bytes)
+output.extend(shstrtab_bytes)
+output.extend([0, 0, 0]) # TODO: unknown
+output.extend(section_headers_bytes)
 
 with open('output', 'wb') as f:
     f.write(bytes(output))
