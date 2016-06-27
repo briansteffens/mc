@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+import stat
 import struct
 from enum import Enum
 
+if len(sys.argv) != 2:
+    print("Usage: ./mc.py <filename>")
+
 b = lambda s, x: [b for b in struct.pack(s, x)]
-b2 = lambda x: b('H', x)
-b4 = lambda x: b('I', x)
-b8 = lambda x: b('L', x)
+b2 = lambda x: b("H", x)
+b4 = lambda x: b("I", x)
+b8 = lambda x: b("L", x)
 bstr = lambda x: [ord(b) for b in x] + [0]
 
 # EI_CLASS: 64-bit
@@ -161,12 +167,28 @@ class SymbolTableEntry(object):
 
 # program code ----------------------------------------------------------------
 
-program_bytes = [
-    0xb8, 0x3c, 0, 0, 0,      # mov rax, 60
-    0xbf, 0x4d, 0, 0, 0,      # mov rdi, 77
-    0x48, 0x83, 0xc7, 0x03,   # add rdi, 3
-    0x0f, 0x05                # syscall
-]
+with open(sys.argv[1]) as f:
+    source = f.readlines()
+
+section = "code"
+program_bytes = []
+
+for line in source:
+    line = line.split(";")[0].strip()
+
+    if not line:
+        continue
+
+    if line == "code:":
+        section = "code"
+        continue
+
+    if section == "code":
+        program_bytes += [int(b, 16) for b in line.split()]
+        continue
+
+    print("Line not in section: {}".format(line))
+    sys.exit(1)
 
 # symtab ----------------------------------------------------------------------
 
@@ -374,7 +396,7 @@ output = []
 # header ----------------------------------------------------------------------
 
 # +0 (4 bytes) EI_MAG
-output.extend([0x7f, ord('E'), ord('L'), ord('F')])
+output.extend([0x7f, ord("E"), ord("L"), ord("F")])
 
 # +4 (1 byte) EI_CLASS
 output.append(ELFCLASS64)
@@ -470,5 +492,15 @@ output.extend(shstrtab_bytes)
 output.extend([0, 0, 0]) # TODO: unknown
 output.extend(section_headers_bytes)
 
-with open('output', 'wb') as f:
+output_fn = sys.argv[1]
+
+if output_fn.endswith(".mc"):
+    output_fn = output_fn.replace(".mc", "")
+
+output_fn += ".a"
+
+with open(output_fn, "wb") as f:
     f.write(bytes(output))
+
+output_stat = os.stat(output_fn)
+os.chmod(output_fn, output_stat.st_mode | stat.S_IEXEC)
