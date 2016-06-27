@@ -2,8 +2,8 @@ mc
 ==
 
 Ever feel like assembly is just too high level? Tired of all those ugly letters
-and fragments of words?? You'd hex edit a binary file directly but it's too
-annoying isn't it?. Now you can write machine code in hex!
+and fragments of words?? Now, thanks to recent scientific discoveries and brand
+new technology, you can write machine code in hex!
 
 Why write something nasty and hard to understand like this:
 
