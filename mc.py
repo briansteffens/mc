@@ -200,13 +200,17 @@ class SymbolTableEntry(object):
 
         return ret
 
-# program code ----------------------------------------------------------------
+# program source --------------------------------------------------------------
 
 with open(sys.argv[1]) as f:
     source = f.readlines()
 
 section = "code"
-program_bytes = []
+
+source_bytes = {
+    "code": [],
+    "data": []
+}
 
 for line in source:
     line = line.split(";")[0].strip()
@@ -214,18 +218,19 @@ for line in source:
     if not line:
         continue
 
-    if line == "code:":
-        section = "code"
+    if line.endswith(":"):
+        section = line[:-1]
         continue
 
-    if section == "code":
-        program_bytes += [int(b, 16) for b in line.split()]
-        continue
+    if section not in source_bytes:
+        print("Line not in section: {}".format(line))
+        sys.exit(1)
 
-    print("Line not in section: {}".format(line))
-    sys.exit(1)
+    source_bytes[section] += [int(b, 16) for b in line.split()]
 
-data_bytes = [ord(c) for c in "Hello, world!\n"]
+program_bytes = source_bytes["code"]
+data_bytes = source_bytes["data"]
+
 
 # symtab ----------------------------------------------------------------------
 
