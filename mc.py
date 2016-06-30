@@ -15,6 +15,15 @@ b4 = lambda x: b("I", x)
 b8 = lambda x: b("L", x)
 bstr = lambda x: [ord(b) for b in x] + [0]
 
+def pad(start, alignment):
+    ret = 0
+
+    while True:
+        if (start + ret) % alignment == 0:
+            return ret
+
+        ret += 1
+
 # EI_CLASS: 64-bit
 ELFCLASS64 = 2
 
@@ -91,6 +100,32 @@ STV_DEFAULT = 0
 STV_INTERNAL = 1
 STV_HIDDEN = 2
 STV_PROTECTED = 3
+
+class ProgramHeader(object):
+
+    def __init__(self):
+        self.p_type = PT_NULL
+        self.p_flags = 0
+        self.p_offset = 0
+        self.p_vaddr = 0
+        self.p_paddr = 0
+        self.p_filesz = 0
+        self.p_memsz = 0
+        self.p_align = 0
+
+    def to_bytes(self):
+        ret = []
+
+        ret.extend(b4(self.p_type))
+        ret.extend(b4(self.p_flags))
+        ret.extend(b8(self.p_offset))
+        ret.extend(b8(self.p_vaddr))
+        ret.extend(b8(self.p_paddr))
+        ret.extend(b8(self.p_filesz))
+        ret.extend(b8(self.p_memsz))
+        ret.extend(b8(self.p_align))
+
+        return ret
 
 class SectionHeader(object):
 
@@ -190,6 +225,8 @@ for line in source:
     print("Line not in section: {}".format(line))
     sys.exit(1)
 
+data_bytes = [ord(c) for c in "Hello, world!\n"]
+
 # symtab ----------------------------------------------------------------------
 
 # symtab + 0 (24 bytes) symtab0
@@ -199,11 +236,11 @@ symtab0 = SymbolTableEntry()
 symtab1 = SymbolTableEntry()
 symtab1.info = STT_SECTION
 symtab1.section_header_index = 1
-symtab1.value = 4194432
+symtab1.value = 4194432 # >> 4194480 (+48)
 
 # symtab + 48 (24 bytes) symtab2
 symtab2 = SymbolTableEntry()
-symtab2.name = "exit77.asm"
+symtab2.name = "add.asm"
 symtab2.info = STT_FILE
 symtab2.section_header_index = 65521
 
@@ -212,28 +249,37 @@ symtab3 = SymbolTableEntry()
 symtab3.name = "_start"
 symtab3.info = 16 # ?
 symtab3.section_header_index = 1
-symtab3.value = 4194432
 
 # symtab + 96 (24 bytes) symtab4
 symtab4 = SymbolTableEntry()
 symtab4.name = "__bss_start"
 symtab4.info = 16 # ?
-symtab4.section_header_index = 1
-symtab4.value = 6291596
+symtab4.section_header_index = 5
+symtab4.value = 6291596 # >> 6291658 (+64)
 
 # symtab + 120 (24 bytes) symtab5
 symtab5 = SymbolTableEntry()
 symtab5.name = "_edata"
 symtab5.info = 16 # ?
-symtab5.section_header_index = 1
-symtab5.value = 6291596
+symtab5.section_header_index = 5
+symtab5.value = 6291596 # >> 62915658 (+64)
 
 # symtab + 144 (24 bytes) symtab6
 symtab6 = SymbolTableEntry()
 symtab6.name = "_end"
 symtab6.info = 16 # ?
-symtab6.section_header_index = 1
-symtab6.value = 6291600
+symtab6.section_header_index = 5
+symtab6.value = 6291600 # >> 6291664 (+64)
+
+# symtab + 168 (24 bytes) symtab7
+symtab7 = SymbolTableEntry()
+symtab7.info = STT_SECTION
+symtab7.section_header_index = 5
+
+# symtab + 192 (24 bytes) symtab8
+symtab8 = SymbolTableEntry()
+symtab8.name = "text"
+symtab8.section_header_index = 5
 
 symtab = [
     symtab0,
@@ -242,7 +288,9 @@ symtab = [
     symtab3,
     symtab4,
     symtab5,
-    symtab6
+    symtab6,
+    symtab7,
+    symtab8
 ]
 
 # strtab ----------------------------------------------------------------------
@@ -332,12 +380,20 @@ sh_strtab.name = "strtab"
 sh_strtab.type = SHT_STRTAB
 sh_strtab.addralign = 1
 
+# e_shoff + 320 - data section
+sh_data = SectionHeader()
+sh_data.name = "data"
+sh_data.type = SHT_PROGBITS
+sh_data.flags = 3
+sh_data.addralign = 4
+
 section_headers = [
     sh_zero,
     sh_text,
     sh_shstrtab,
     sh_symtab,
-    sh_strtab
+    sh_strtab,
+    sh_data
 ]
 
 # shstrtab --------------------------------------------------------------------
@@ -361,17 +417,81 @@ for s in shstrtab:
     shstrtab_bytes.append(0x2e) # TODO: unknown
     shstrtab_bytes.extend(bstr(s))
 
+# program headers -------------------------------------------------------------
+
+code_header = ProgramHeader()
+code_header.p_type = PT_LOAD
+code_header.p_flags = PF_R | PF_X
+code_header.p_offset = 0
+code_header.p_vaddr = 4194304
+code_header.p_paddr = 4194304
+code_header.p_align = 2097152
+
+data_header = ProgramHeader()
+data_header.p_type = PT_LOAD
+data_header.p_flags = PF_R | PF_W
+data_header.p_filesz = len(data_bytes)
+data_header.p_memsz = len(data_bytes)
+data_header.p_align = 2097152
+
+program_headers = [
+    code_header,
+    data_header
+]
+
+program_header_byte_count = len(program_headers) * 56
+
 # final calculations ----------------------------------------------------------
 
+symtab_byte_count = len(symtab) * 24
+
 sh_text.size = len(program_bytes)
+sh_data.size = len(data_bytes)
 sh_symtab.size = len(symtab_bytes)
 sh_strtab.size = len(strtab_bytes)
 sh_shstrtab.size = len(shstrtab_bytes)
 
-sh_text.offset = 128
-sh_symtab.offset = sh_text.offset + sh_text.size + 4
+sh_text.offset = 64 + program_header_byte_count
+
+sh_data.offset = sh_text.offset + sh_text.size
+pad_data = pad(sh_data.offset, 4)
+sh_data.offset += pad_data
+
+sh_symtab.offset = sh_data.offset + sh_data.size
+pad_symtab = pad(sh_symtab.offset, 8)
+sh_symtab.offset += pad_symtab
+
 sh_strtab.offset = sh_symtab.offset + sh_symtab.size
 sh_shstrtab.offset = sh_strtab.offset + sh_strtab.size
+
+e_shoff = (
+    64 +
+    program_header_byte_count +
+    len(program_bytes) +
+    pad_data +
+    len(data_bytes) +
+    pad_symtab +
+    len(symtab_bytes) +
+    len(strtab_bytes) +
+    len(shstrtab_bytes)
+)
+
+pad_section_headers = pad(e_shoff, 4)
+e_shoff += pad_section_headers
+
+code_header.p_filesz = sh_text.offset + sh_text.size
+code_header.p_memsz = code_header.p_filesz
+
+data_header.p_vaddr = data_header.p_align * 3 + sh_data.offset
+data_header.p_paddr = data_header.p_vaddr
+symtab7.value = data_header.p_vaddr
+symtab8.value = data_header.p_vaddr
+sh_data.addr = data_header.p_vaddr
+
+entry_point = code_header.p_vaddr + sh_text.offset
+symtab3.value = entry_point
+
+data_header.p_offset = sh_data.offset
 
 # Render section headers
 section_headers_bytes = []
@@ -379,15 +499,17 @@ section_headers_bytes = []
 for sh in section_headers:
     section_headers_bytes.extend(sh.to_bytes())
 
-e_shoff = (
-    128 +
-    len(program_bytes) +
-    4 +
-    len(symtab_bytes) +
-    len(strtab_bytes) +
-    len(shstrtab_bytes) +
-    3
-)
+# Render program header
+program_header_bytes = []
+
+for ph in program_headers:
+    program_header_bytes.extend(ph.to_bytes())
+
+# Render symtab
+symtab_bytes = []
+
+for st in symtab:
+    symtab_bytes.extend(st.to_bytes())
 
 # output ----------------------------------------------------------------------
 
@@ -426,7 +548,7 @@ output.extend(b2(EM_X86_64))
 output.extend(b4(EV_CURRENT))
 
 # +24 (8 bytes) e_entry
-output.extend(b8(4194432))
+output.extend(b8(entry_point))
 
 # +32 (8 bytes) e_phoff
 output.extend(b8(64))
@@ -444,52 +566,26 @@ output.extend(b2(64))
 output.extend(b2(56))
 
 # +56 (2 bytes) e_phnum
-output.extend(b2(1))
+output.extend(b2(len(program_headers)))
 
 # +58 (2 bytes) e_shentsize
 output.extend(b2(64))
 
 # +60 (2 bytes) e_shnum
-output.extend(b2(5))
+output.extend(b2(len(section_headers)))
 
 # +62 (2 bytes) e_shstrndx
-output.extend(b2(2))
+output.extend(b2(2)) # >> 3
 
-# ? ---------------------------------------------------------------------------
-
-# +64 (4 bytes) p_type
-output.extend(b4(PT_LOAD))
-
-# +68 (4 bytes) p_flags
-output.extend(b4(PF_R | PF_X))
-
-# +72 (8 bytes) p_offset
-output.extend(b8(0))
-
-# +80 (8 bytes) p_vaddr
-output.extend(b8(4194304))
-
-# +88 (8 bytes) p_paddr
-output.extend(b8(4194304))
-
-# +96 (8 bytes) p_filesz
-output.extend(b8(140))
-
-# +104 (8 bytes) p_memsz
-output.extend(b8(140))
-
-# +112 (8 bytes) p_align
-output.extend(b8(2097152))
-
-# +120 (8 bytes) TODO: unknown
-output.extend([0, 0, 0, 0, 0, 0, 0, 0])
-
+output.extend(program_header_bytes)
 output.extend(program_bytes)
-output.extend([0, 0, 0, 0]) # TODO: unknown
+output.extend([0 for i in range(pad_data)])
+output.extend(data_bytes)
+output.extend([0 for i in range(pad_symtab)])
 output.extend(symtab_bytes)
 output.extend(strtab_bytes)
 output.extend(shstrtab_bytes)
-output.extend([0, 0, 0]) # TODO: unknown
+output.extend([0 for i in range(pad_section_headers)])
 output.extend(section_headers_bytes)
 
 output_fn = sys.argv[1]
