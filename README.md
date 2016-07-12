@@ -16,8 +16,8 @@ Why write something nasty and hard to understand like this:
 When you could write this!
 
 ```mc
-    b8 3c 00 00 00
-    bf 4d 00 00 00
+    48 b8 3c 00 00 00 00 00 00 00
+    48 bf 4d 00 00 00 00 00 00 00
     0f 05
 ```
 
