@@ -212,6 +212,8 @@ source_bytes = {
     "data": []
 }
 
+data_offsets = []
+
 for line in source:
     line = line.split(";")[0].strip()
 
@@ -226,10 +228,22 @@ for line in source:
         print("Line not in section: {}".format(line))
         sys.exit(1)
 
-    source_bytes[section] += [int(b, 16) for b in line.split()]
+    for x in line.split():
+        if x[0] == "+":
+            if section != "code":
+                print("Data offset (" + x + ") invalid outside code section.")
+                sys.exit(1)
+
+            data_offsets.append((len(source_bytes[section]), int(x[1:])))
+
+            continue
+
+        source_bytes[section].append(int(x, 16))
 
 program_bytes = source_bytes["code"]
 data_bytes = source_bytes["data"]
+
+program_bytes_len = len(program_bytes) + len(data_offsets) * 8
 
 
 # symtab ----------------------------------------------------------------------
@@ -450,7 +464,7 @@ program_header_byte_count = len(program_headers) * 56
 
 symtab_byte_count = len(symtab) * 24
 
-sh_text.size = len(program_bytes)
+sh_text.size = program_bytes_len
 sh_data.size = len(data_bytes)
 sh_symtab.size = len(symtab_bytes)
 sh_strtab.size = len(strtab_bytes)
@@ -472,7 +486,7 @@ sh_shstrtab.offset = sh_strtab.offset + sh_strtab.size
 e_shoff = (
     64 +
     program_header_byte_count +
-    len(program_bytes) +
+    program_bytes_len +
     pad_data +
     len(data_bytes) +
     pad_symtab +
@@ -497,6 +511,10 @@ entry_point = code_header.p_vaddr + sh_text.offset
 symtab3.value = entry_point
 
 data_header.p_offset = sh_data.offset
+
+# Insert data offsets
+for position, offset in reversed(data_offsets):
+    program_bytes[position:1] = b8(sh_data.addr + offset)
 
 # Render section headers
 section_headers_bytes = []
