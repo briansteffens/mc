@@ -8,13 +8,11 @@ data:
 
 code:
     48 b8 01 00 00 00 00 00 00 00       ; mov rax, 1
-    48 b8 01 00 00 00 00 00 00 00       ; mov rax, 1
     48 bf 01 00 00 00 00 00 00 00       ; mov rdi, 1
     48 be +0                            ; mov rsi, [data + 0]
     48 ba 0e 00 00 00 00 00 00 00       ; mov rdx, 14
     0f 05                               ; syscall
 
-    48 b8 01 00 00 00 00 00 00 00       ; mov rax, 1
     48 b8 01 00 00 00 00 00 00 00       ; mov rax, 1
     48 bf 01 00 00 00 00 00 00 00       ; mov rdi, 1
     48 be +14                           ; mov rsi, [data + 14]
